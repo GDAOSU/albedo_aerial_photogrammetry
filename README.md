@@ -7,7 +7,7 @@ Thank you for your interest in our work. We look forward to sharing our tools an
 
 |Original  texture | Agisoft Delighter | Ours |
 |---|---|---|
-|![original texture](https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/metashape0001-0096.webm) |![Agisoft Delighter](https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/delighter0001-0096.webm) | ![Ours](https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/ours0001-0096.webm)|
+|[![](https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/metashape0001-0096.mp4)](https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/metashape0001-0096.mp4) |![Agisoft Delighter](https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/delighter0001-0096.mp4) | ![Ours](https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/ours0001-0096.mp4)|
 
 
 ## Code Release Roadmap
