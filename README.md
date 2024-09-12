@@ -4,6 +4,12 @@ This repository contains the upcoming implementation of the albedo recovery appr
 
 Thank you for your interest in our work. We look forward to sharing our tools and seeing the amazing results you achieve with them!
 
+
+|Original  texture | Agisoft Delighter | Ours |
+|---|---|---|
+|[original texture](https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/metashape0001-0096.mkv) |[Agisoft Delighter](https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/delighter0001-0096.mkv) | [Ours](https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/ours0001-0096.mkv)|
+
+
 ## Code Release Roadmap
 
 We are actively working on preparing the code for public release. Below is our planned release roadmap:
