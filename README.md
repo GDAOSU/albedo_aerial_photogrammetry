@@ -4,6 +4,8 @@ This repository contains the upcoming implementation of the albedo recovery appr
 
 This work extends our prior work [“A Novel Intrinsic Image Decomposition Method to Recover Albedo for Aerial Images in Photogrammetry Processing”](https://isprs-annals.copernicus.org/articles/V-2-2022/23/2022/) presented at the ISPRS Congress 2022.
 
+<video src="https://github.com/user-attachments/assets/f0972c11-e748-4532-a57a-ee41de9256fc" width="100%" controls autoplay loop></video>
+<video src="https://github.com/user-attachments/assets/146038c2-effa-422a-aa1a-5f7ad17f5830" width="100%" controls autoplay loop></video>
 
 <table border="0" style="width: 100%; text-align: left; margin-top: 20px;">
 <tr>
@@ -13,13 +15,13 @@ This work extends our prior work [“A Novel Intrinsic Image Decomposition Metho
 </tr>
 <tr>
 <td>
-<video src="https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/metashape0001-0096.mp4" width="100%" controls autoplay loop></video>
+<video src="https://github.com/user-attachments/assets/a37893e2-3d02-4500-9a91-e8d0750d1198" width="100%" controls autoplay loop></video>
 </td>
 <td>
-<video src="https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/delighter0001-0096.mp4" width="100%" controls autoplay loop></video>
+<video src="https://github.com/user-attachments/assets/eababd5b-e9e2-4a19-8d1a-e8833c8efc5c" width="100%" controls autoplay loop></video>
 </td>
 <td>
-<video src="https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/ours0001-0096.mp4" width="100%" controls autoplay loop></video>
+<video src="https://github.com/user-attachments/assets/b4841e14-5cd3-4be0-bc75-d371a5152e6b" width="100%" controls autoplay loop></video>
 </td>
 </tr>
 </table>
