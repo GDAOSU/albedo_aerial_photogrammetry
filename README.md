@@ -1,14 +1,30 @@
 # Albedo Recovery for Aerial Photogrammetric Images
 
-This repository contains the upcoming implementation of the albedo recovery approach described in the paper: [A general albedo recovery approach for aerial photogrammetric images through inverse rendering](https://authors.elsevier.com/a/1jlhp3I9x1qnxt).
+This repository contains the upcoming implementation of the albedo recovery approach described in the paper: [A general albedo recovery approach for aerial photogrammetric images through inverse rendering](https://authors.elsevier.com/a/1jlhp3I9x1qnxt). 
+
+This work extends our prior work [“A Novel Intrinsic Image Decomposition Method to Recover Albedo for Aerial Images in Photogrammetry Processing”](https://isprs-annals.copernicus.org/articles/V-2-2022/23/2022/) presented at the ISPRS Congress 2022.
+
+
+<table border="0" style="width: 100%; text-align: left; margin-top: 20px;">
+<tr>
+<td align='center'>Original Texture</td>
+<td align='center'>Agisoft Delighter</td>
+<td align='center'>Ours</td>
+</tr>
+<tr>
+<td>
+<video src="https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/metashape0001-0096.mp4" width="100%" controls autoplay loop></video>
+</td>
+<td>
+<video src="https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/delighter0001-0096.mp4" width="100%" controls autoplay loop></video>
+</td>
+<td>
+<video src="https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/ours0001-0096.mp4" width="100%" controls autoplay loop></video>
+</td>
+</tr>
+</table>
 
 Thank you for your interest in our work. We look forward to sharing our tools and seeing the amazing results you achieve with them!
-
-
-|Original  texture | Agisoft Delighter | Ours |
-|---|---|---|
-|[![](https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/metashape0001-0096.mp4)](https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/metashape0001-0096.mp4) |![Agisoft Delighter](https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/delighter0001-0096.mp4) | ![Ours](https://raw.githubusercontent.com/GDAOSU/albedo_aerial_photogrammetry/main/doc/GoodalePark/ours0001-0096.mp4)|
-
 
 ## Code Release Roadmap
 
@@ -20,10 +36,6 @@ We are actively working on preparing the code for public release. Below is our p
 |Run Code release | 2024/12 | Pending |
 |Evaluation and Experiments | 2025/02 | Pending |
 
-
-## Acknowledgements
-
-This work extends our prior work [“A Novel Intrinsic Image Decomposition Method to Recover Albedo for Aerial Images in Photogrammetry Processing”](https://isprs-annals.copernicus.org/articles/V-2-2022/23/2022/) presented at the ISPRS Congress 2022.
 
 ## Citations
 
