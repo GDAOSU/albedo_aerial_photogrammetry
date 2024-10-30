@@ -34,10 +34,15 @@ We are actively working on preparing the code for public release. Below is our p
 
 | Milestone | Planned Date | Status |
 |----|----| ----|
-|Synthetic dataset release | 2024/11 | Preparing |
-|Run Code release | 2024/12 | Pending |
-|Evaluation and Experiments | 2025/02 | Pending |
+|Synthetic dataset release | 2024/11 | Released |
+|Run Code release | 2024/12 | Released |
+|Evaluation and Experiments | 2024/12 | Pending |
 
+## Synthetic Dataset
+For detailed information about the synthetic dataset, please refer to the [Synthetic Datasets Documentation](./doc/synthetic_datasets.md).
+
+## Read-world Dataset Preparation Guideline
+Please refer to [Real-world Dataset Preparation Guideline](./doc/dataset_preprocessing.md).
 
 ## Citations
 
