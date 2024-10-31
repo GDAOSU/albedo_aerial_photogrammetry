@@ -143,7 +143,7 @@ def _get_parser():
     parser = argparse.ArgumentParser(description="Compute Lit Shadow Ratio (Sun/Sky Ratio)")
     parser.add_argument("input_folder", type=str, help="Input folder (ContextCapture Tiled OBJ)")
     parser.add_argument("--skymodel", type=str, choices=["Simple", "AO"], default="Simple", help="Sky Model")
-    parser.add_argument("--logrithm_phi", action="store_true", help="Use logrithm of phi")
+    parser.add_argument("--logarithm_phi", action="store_true", help="Use logarithm of phi")
     return parser
 
 
@@ -159,7 +159,7 @@ def _main():
     OUTPUT_PHI_JSON = osp.join(LITSHADOW_BAND_DIR, "phi.json")
 
     OPTION_skyvis_model = args.skymodel
-    OPTION_logrithm_phi = args.logrithm_phi
+    OPTION_logarithm_phi = args.logarithm_phi
 
     # CONST_PSI_SUN = np.array([1.0, 0.95, 0.93], dtype=np.float32)
     CONST_PSI_SUN = np.array([1.0, 1.0, 1.0], dtype=np.float32)
@@ -241,7 +241,7 @@ def _main():
         # logX = log(psi_sky) - log(psi_sun) = log(imgshadow) + log(max(0,normal@omega_sun)) - log(img_lit-imgshadow) - log(skyvis)
         ########################################
         Xest = None
-        if OPTION_logrithm_phi:
+        if OPTION_logarithm_phi:
             logPhi = (
                 np.log(imgband_shadow).squeeze(1)
                 - np.log(imgband_lit - imgband_shadow).squeeze(1)
@@ -270,7 +270,7 @@ def _main():
         else:
             probX = np.ones(Xest.shape[0])
 
-        if OPTION_logrithm_phi:
+        if OPTION_logarithm_phi:
             ratio_sky_sun = np.exp(logPhi[probX.argmax()])
         else:
             ratio_sky_sun = Phi[probX.argmax()]
@@ -302,7 +302,7 @@ def _main():
         frame_phi=frame_phi_skysun,
         psi_sun=CONST_PSI_SUN,
         skyvis_model=OPTION_skyvis_model,
-        estLogPhi=OPTION_logrithm_phi,
+        estLogPhi=OPTION_logarithm_phi,
     )
 
     with open(OUTPUT_PHI_JSON, "w") as fp:

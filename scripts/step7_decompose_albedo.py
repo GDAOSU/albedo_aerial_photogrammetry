@@ -97,7 +97,9 @@ def _get_parser():
     parser = argparse.ArgumentParser(description="Sample Lit Shadow Band")
     parser.add_argument("input_folder", type=str, help="Input folder (ContextCapture Tiled OBJ)")
     parser.add_argument("output_folder", type=str, help="Output folder")
-
+    parser.add_argument("--median_phi", action="store_true", help="Use median phi")
+    parser.add_argument("--average_phi", action="store_true", help="Use average phi")
+    parser.add_argument("--refine_sunvis", action="store_true", help="Refine sunvis")
     return parser
 
 
@@ -118,6 +120,10 @@ def _main() -> int:
     phipack_path = litshadow_band_dir / "phi.json"
     phipack = json.load(phipack_path.open())
     frame_phi = dict(zip(phipack["frame_name"], np.array(phipack["frame_phi"])))
+
+    median_phi = np.median(phipack["frame_phi"], axis=0, keepdims=True)
+    mean_phi = np.mean(phipack["frame_phi"], axis=0, keepdims=True)
+
     frame_omega_sun = dict(zip(phipack["frame_name"], np.array(phipack["frame_omega_sun"])))
     psi_sun = np.array(phipack["psi_sun"])
 
@@ -173,15 +179,20 @@ def _main() -> int:
 
         _st = time.time()
 
+        current_phi = frame_phi[imgname]
+        if args.median_phi:
+            current_phi = median_phi
+        elif args.average_phi:
+            current_phi = mean_phi
+
         sun_illum, sky_illum = get_illumination(
             data["normal"],
             psi_sun,
             omega_sun,
-            frame_phi[imgname],
+            current_phi,
             data["skyvisratio"],
             skyvis_model=phipack["skyvis_model"],
         )
-
         # Detect maximum reflectance in sunvis region
         # max_reflectance = ((data['img'] / (sun_illum+1e-7))*np.expand_dims(data['sunviscrf'],2)).reshape(-1,3).max(0) # Failed, very large
         max_reflectance = (data["img"] * data["sunviscrf"]).reshape(-1, 3).max(0)
@@ -189,15 +200,19 @@ def _main() -> int:
         if (max_reflectance > 5).any():
             logger.warning(f"Warning: max reflectance is {max_reflectance}")
 
-        refined_alpha = refine_sunvis(
-            data["img"],
-            data["sunviscrf"],
-            sun_illum,
-            sky_illum,
-            data["lsband"]["sampler"]["prof_pt"],
-            height=height,
-            width=width,
-        )
+        if args.refine_sunvis:
+            refined_alpha = refine_sunvis(
+                data["img"],
+                data["sunviscrf"],
+                sun_illum,
+                sky_illum,
+                data["lsband"]["sampler"]["prof_pt"],
+                height=height,
+                width=width,
+            )
+        else:
+            refined_alpha = data["sunviscrf"]
+            
         illumination = sun_illum * refined_alpha + sky_illum
         reflectance = data["img"] / (illumination + 1e-7)
         reflectance = np.clip(reflectance, 0, max_reflectance)
@@ -214,9 +229,7 @@ def _main() -> int:
         # plt.show()
         imageio.imwrite(str(output_albedo_hdr_path), reflectance.astype(np.float32))
         imageio.imwrite(str(output_refinealpha_path), refined_alpha.astype(np.float32))
-
-        print(reflectance_ldr.shape)
-        imageio.imwrite(str(output_albedo_ldr_path), (reflectance_ldr*255).astype(np.uint8))
+        imageio.imwrite(str(output_albedo_ldr_path), (reflectance_ldr * 255).astype(np.uint8))
         if verbose:
             logger.info(f"{time.time()-_st:.3f}s")
 

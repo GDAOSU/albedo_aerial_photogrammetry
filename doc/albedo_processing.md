@@ -146,9 +146,23 @@ python scripts/step5_process_litshadow_band.py $workdir
 
 Example:
 ``` bash
-python scripts/step6_compute_sunsky_ratio.py --skymodel AO --logrithm_phi $workdir 
+python scripts/step6_compute_sunsky_ratio.py --skymodel AO --logarithm_phi $workdir 
 ```
 
 ### Step 7: Compute Albedo
 
+Example:
+
 ``` bash
+python scripts/step7_decompose_albedo.py --median_phi $workdir $workdir/export
+```
+
+### Step 8: Undistort image (optional)
+
+For some applications like texture mapping, user may need undistorted images.
+
+
+
+``` bash
+python scripts/step8_undistortion.py $workdir/imagedataset.json  $workdir/export_ao_logarithm --gammar_correction
+```
