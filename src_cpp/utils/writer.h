@@ -1,3 +1,5 @@
+#ifndef WRITER_H
+#define WRITER_H
 #include <stdint.h>
 
 #include <string>
@@ -17,3 +19,5 @@ bool SaveUIntNEXR(const std::vector<uint32_t> &buffer, int width, int height, in
 
 bool LoadSphericalDelaunay(SphericalDelaunay *dela, std::string infilename);
 bool SaveSphericalDelaunay(const SphericalDelaunay *dela, std::string outfilename);
+
+#endif // WRITER_H

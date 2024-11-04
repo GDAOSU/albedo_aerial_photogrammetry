@@ -44,8 +44,8 @@ def imwriter(data: np.ndarray, p: str):
     p = str(p)
     _ext = osp.splitext(p)[1]
     if _ext.lower() == ".exr":
-        height, width = data.shape[0], data.shape[1]
-        exrspec = ImageSpec(width, height, 3, "float16")
+        height, width, band = data.shape[0], data.shape[1], data.shape[2]
+        exrspec = ImageSpec(width, height, band, str(data.dtype))
         out = ImageOutput.create(p)
         out.open(p, exrspec)
         out.write_image(data)
@@ -233,7 +233,7 @@ if __name__ == "__main__":
         if not osp.exists(outhdrpath):
             # Undistort HDR Image
             HDRimg = file
-            undistHDRimg = cammodel.undistort_image(HDRimg)
+            undistHDRimg = cammodel.undistort_image(HDRimg).astype(HDRimg.dtype)
 
             # Write to file
             imwriter(undistHDRimg, outhdrpath)
@@ -245,7 +245,7 @@ if __name__ == "__main__":
             undistLDRimg /= np.nanpercentile(undistLDRimg.reshape(-1), 99, axis=0)
             undistLDRimg = np.clip(undistLDRimg, 0, 1)
             if args.gammar_correction:
-                undistLDRimg = undistLDRimg**(1 / 2.2)  # Gamma correction
+                undistLDRimg = undistLDRimg ** (1 / 2.2)  # Gamma correction
             imageio.imwrite(outldrpath, (undistLDRimg * 255).astype(np.uint8))
 
         C = np.array([imgext["X"], imgext["Y"], imgext["Z"]]).reshape(3, 1)
