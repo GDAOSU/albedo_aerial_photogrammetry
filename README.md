@@ -1,6 +1,6 @@
 # Albedo Recovery for Aerial Photogrammetric Images
 
-This repository contains the upcoming implementation of the albedo recovery approach described in the paper: [A general albedo recovery approach for aerial photogrammetric images through inverse rendering](https://authors.elsevier.com/a/1jlhp3I9x1qnxt). 
+This repository contains the upcoming implementation of the albedo recovery approach described in the paper: [A general albedo recovery approach for aerial photogrammetric images through inverse rendering](https://www.sciencedirect.com/science/article/pii/S0924271624003319). 
 
 This work extends our prior work [“A Novel Intrinsic Image Decomposition Method to Recover Albedo for Aerial Images in Photogrammetry Processing”](https://isprs-annals.copernicus.org/articles/V-2-2022/23/2022/) presented at the ISPRS Congress 2022.
 
