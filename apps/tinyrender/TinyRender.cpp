@@ -12,18 +12,24 @@
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
-#include "stb/stb_image_write.h"
 
 #include <assimp/Importer.hpp>
 #include <filesystem>
 #include <fstream>
 
+#include "EnvironmentMap.h"
+#include "stb/stb_image_write.h"
 #include "utils/writer.h"
 
 namespace fs = std::filesystem;
 
 const std::string TinyRender::BUFFERS_NAME[TinyRender::NUM_BUFFERS] = {
-    "geomid", "barycentric", "depth", "normal", "primid", "color", "indir", "sunvis", "skyvis"};
+    "geomid", "barycentric", "depth", "normal", "primid", "color", "indir", "sunvis", "skyvis", "skycam"};
+
+const std::string RTCErrorString[] = {
+    "RTC_ERROR_NONE",          "RTC_ERROR_UNKNOWN",         "RTC_ERROR_INVALID_ARGUMENT", "RTC_ERROR_INVALID_OPERATION",
+    "RTC_ERROR_OUT_OF_MEMORY", "RTC_ERROR_UNSUPPORTED_CPU", "RTC_ERROR_CANCELLED",
+};
 
 TinyRender::TinyRender() : scene(nullptr) {
   device = rtcNewDevice(NULL);
@@ -103,6 +109,21 @@ bool TinyRender::set_scene(const aiScene* aiscene) {
     spdlog::error("[AOProps] Number of Meshes don't match: {} vs {}", aoprops.buffer.size(), aiscene->mNumMeshes);
     return false;
   }
+
+  std::vector<std::array<float, 3>> skycamsamples;
+
+  if (requireBuffers[SKYCAM]) {
+    skycamsamples.resize(aoprops.num_samples);
+    EnvironmentMap envmap;
+    envmap.load(this->envmaplist[0]);
+    spdlog::info("Loaded EnvironmentMap: {}", this->envmaplist[0]);
+    for (int ri = 0; ri < aoprops.num_samples; ri++) {
+      const float azimuth = atan2(dirsamples.coords()[ri * 3], dirsamples.coords()[ri * 3 + 1] + 1.0e-6) * 180.f / M_PI;
+      const float elevation = asin(dirsamples.coords()[ri * 3 + 2]) * 180.f / M_PI;
+      skycamsamples[ri] = envmap.sample(azimuth, elevation);
+    }
+  }
+
   // Passed checking
   if (scene) rtcReleaseScene(scene);
   scene = rtcNewScene(device);
@@ -111,7 +132,7 @@ bool TinyRender::set_scene(const aiScene* aiscene) {
 
     RTCGeometry _geom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
     rtcSetGeometryBuildQuality(_geom, RTC_BUILD_QUALITY_HIGH);
-    rtcSetGeometryVertexAttributeCount(_geom, 2);
+    rtcSetGeometryVertexAttributeCount(_geom, 3);
 
     float* _vertices = (float*)rtcSetNewGeometryBuffer(_geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3,
                                                        3 * sizeof(float), _mesh->mNumVertices);
@@ -123,9 +144,25 @@ bool TinyRender::set_scene(const aiScene* aiscene) {
     float* pertri_normals = new float[_mesh->mNumFaces * 3];
 
     float* skyvis = nullptr;
+    float* skycam = nullptr;
+
     if (requireBuffers[SKYVIS]) {
       skyvis = (float*)rtcSetNewGeometryBuffer(_geom, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 1, RTC_FORMAT_FLOAT,
                                                sizeof(float), _mesh->mNumVertices);
+      if (skyvis == nullptr) {
+        RTCError error = rtcGetDeviceError(device);
+        spdlog::critical("Failed to allocate skyvis buffer, error: {}", RTCErrorString[error]);
+        return false;
+      }
+    }
+    if (requireBuffers[SKYCAM]) {
+      skycam = (float*)rtcSetNewGeometryBuffer(_geom, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 2, RTC_FORMAT_FLOAT3,
+                                               3 * sizeof(float), _mesh->mNumVertices);
+      if (skycam == nullptr) {
+        RTCError error = rtcGetDeviceError(device);
+        spdlog::critical("Failed to allocate skycam buffer, error: {}", RTCErrorString[error]);
+        return false;
+      }
     }
 
     uint32_t* _faces = (uint32_t*)rtcSetNewGeometryBuffer(_geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3,
@@ -145,19 +182,6 @@ bool TinyRender::set_scene(const aiScene* aiscene) {
         float numer = 0;
         float denom = 0;
         for (int ri = 0; ri < aoprops.num_samples; ++ri) {
-// #define CONSTSKY_COSINE
-#ifdef CONSTSKY_COSINE
-          float cosTerm = normals[_i * 3] * dirsamples.coords()[ri * 3] +
-                          normals[_i * 3 + 1] * dirsamples.coords()[ri * 3 + 1] +
-                          normals[_i * 3 + 2] * dirsamples.coords()[ri * 3 + 2];
-          // float cosTheta Sky Model = dirsamples.coords()[ri * 3 + 2];  // := z = w_i @ [0,0,1]
-          if (aoprops.test(meshID, _i, ri)) {
-            // @max
-
-            numer += std::max<float>(0.f, cosTerm);
-          }
-          denom += std::max<float>(0.f, cosTerm);
-#else
           float cosTerm = normals[_i * 3] * dirsamples.coords()[ri * 3] +
                           normals[_i * 3 + 1] * dirsamples.coords()[ri * 3 + 1] +
                           normals[_i * 3 + 2] * dirsamples.coords()[ri * 3 + 2];
@@ -166,12 +190,32 @@ bool TinyRender::set_scene(const aiScene* aiscene) {
             numer += std::max<float>(0.f, cosTerm);
           }
           denom += std::abs(cosTerm);
-#endif
         }
-
         skyvis[_i] = numer / denom;
       }
-    }
+
+      if (requireBuffers[SKYCAM]) {
+        float numerR = 0, numerG = 0, numerB = 0;
+        float denom = 0;
+        for (int ri = 0; ri < aoprops.num_samples; ++ri) {
+          float cosTerm = normals[_i * 3] * dirsamples.coords()[ri * 3] +
+                          normals[_i * 3 + 1] * dirsamples.coords()[ri * 3 + 1] +
+                          normals[_i * 3 + 2] * dirsamples.coords()[ri * 3 + 2];
+          if (aoprops.test(meshID, _i, ri)) {
+            const auto& skypixel = skycamsamples[ri];
+            numerR += std::max<float>(0.f, cosTerm) * skypixel[0];
+            numerG += std::max<float>(0.f, cosTerm) * skypixel[1];
+            numerB += std::max<float>(0.f, cosTerm) * skypixel[2];
+          }
+          denom += std::abs(cosTerm);
+        }
+
+        skycam[_i * 3 + 0] = numerR / denom;
+        skycam[_i * 3 + 1] = numerG / denom;
+        skycam[_i * 3 + 2] = numerB / denom;
+      }
+    }  // end of vertex loop
+
 #pragma omp parallel for
     for (int _i = 0; _i < _mesh->mNumFaces; ++_i) {
       _faces[_i * 3 + 0] = _mesh->mFaces[_i].mIndices[0];
@@ -273,6 +317,13 @@ bool TinyRender::load_modeldataset(std::string inpath) {
   return true;
 }
 
+bool TinyRender::load_environment(std::string inpath) {
+  this->envmaplist.clear();
+  for (int i = 0; i < imagelist.size(); i++) {
+    this->envmaplist.push_back(inpath);
+  }
+  return true;
+}
 bool TinyRender::prepare_data() {
   if (imagejson.contains("metadata")) {
     std::string imagejson_srs = imagejson["metadata"].value<std::string>("SRS", "Unknown");
@@ -306,12 +357,23 @@ bool TinyRender::prepare_data() {
   return true;
 }
 
+#include <ImfFrameBuffer.h>
+#include <ImfHeader.h>
+#include <ImfImageChannel.h>
+#include <ImfInputFile.h>
+
 bool TinyRender::render_frame(size_t id) {
   bool with_pertri_normals = true;
   std::string imgname = imagelist[id];
+  std::string envmap_path = envmaplist[id];
+
   auto extJS = extrinsicJS[imgname];
 
   spdlog::debug("imgname {}", imgname);
+  spdlog::debug("envmap {}", envmap_path);
+
+  EnvironmentMap envmap;
+
   std::string camid = extJS["Camera"].get<std::string>();
   spdlog::debug("camid {}", camid);
   CameraT camera = get_camera(camid);
@@ -340,6 +402,14 @@ bool TinyRender::render_frame(size_t id) {
   if (requireBuffers[SUNVIS]) sunVisBuffer = std::vector<uint8_t>(num_px, 0);
   if (requireBuffers[SKYVIS]) {
     skyVisBuffer = std::vector<uint8_t>(num_px, 0);
+  }
+
+  if (requireBuffers[SKYCAM]) {
+    if (envmap.load(envmap_path) == false) {
+      spdlog::error("Cannot load envmap: {}", envmap_path);
+      return false;
+    }
+    skyCamBuffer = std::vector<float>(num_px * 3, 0);
   }
 
   IntersectContext context;
@@ -394,6 +464,14 @@ bool TinyRender::render_frame(size_t id) {
           rtcInterpolate0(hitgeom, ray.primID, ray.u, ray.v, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 1, &skyhits, 1);
           skyVisBuffer[pxi] = skyhits * 255.f;
         }
+        if (requireBuffers[SKYCAM]) {
+          float skycamhits[3] = {0, 0, 0};
+          rtcInterpolate0(hitgeom, ray.primID, ray.u, ray.v, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 2, &skycamhits[0], 3);
+          skyCamBuffer[pxi] = skycamhits[0];
+          skyCamBuffer[pxi + num_px] = skycamhits[1];
+          skyCamBuffer[pxi + 2 * num_px] = skycamhits[2];
+        }
+
         if (requireBuffers[GEOMID]) {
           RTCGeometry _geom = rtcGetGeometry(scene, ray.geomID);
           uint32_t* _face = (uint32_t*)rtcGetGeometryBufferData(_geom, RTC_BUFFER_TYPE_INDEX, 0);
@@ -425,12 +503,18 @@ bool TinyRender::render_frame(size_t id) {
 
   // Output Section
   sw.reset();
-  if (requireBuffers[GEOMID])
+  if (requireBuffers[GEOMID]) {
     SaveUIntNEXR(geomidBuffer, camera.w, camera.h, 5, outputDirs[GEOMID] / (imgname + ".exr"));
-  if (requireBuffers[BARYCENTRIC])
+  }
+  if (requireBuffers[BARYCENTRIC]) {
     SaveHalfNEXR(barycentricBuffer, camera.w, camera.h, 2, outputDirs[BARYCENTRIC] / (imgname + ".exr"));
-  if (requireBuffers[DEPTH]) SaveHalf1EXR(depthBuffer, camera.w, camera.h, outputDirs[DEPTH] / (imgname + ".exr"));
-  if (requireBuffers[NORMAL]) SaveHalf3EXR(normalBuffer, camera.w, camera.h, outputDirs[NORMAL] / (imgname + ".exr"));
+  }
+  if (requireBuffers[DEPTH]) {
+    SaveHalf1EXR(depthBuffer, camera.w, camera.h, outputDirs[DEPTH] / (imgname + ".exr"));
+  }
+  if (requireBuffers[NORMAL]) {
+    SaveHalf3EXR(normalBuffer, camera.w, camera.h, outputDirs[NORMAL] / (imgname + ".exr"));
+  }
   // if (requireBuffers[COLOR]) stbi_write_png((outputDirs[COLOR] / (imgname + ".png")).c_str(),camera.w, camera.h,
   // 3, colorBuffer.data(), camera.w * 3); if (requireBuffers[INDIR]) stbi_write_png((outputDirs[INDIR] / (imgname +
   // ".png")).c_str(), camera.w, camera.h, 3, indirBuffer.data(), camera.w * 3);
@@ -441,6 +525,11 @@ bool TinyRender::render_frame(size_t id) {
     stbi_write_png((outputDirs[SKYVIS] / (imgname + ".png")).c_str(), camera.w, camera.h, 1, skyVisBuffer.data(),
                    camera.w);
   }
+
+  if (requireBuffers[SKYCAM]) {
+    SaveHalf3EXR(skyCamBuffer, camera.w, camera.h, outputDirs[SKYCAM] / (imgname + ".exr"));
+  }
+
   spdlog::info("Write Buffers: {:.3}s", sw);
 
   return true;

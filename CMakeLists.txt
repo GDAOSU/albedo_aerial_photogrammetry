@@ -78,5 +78,6 @@ endif()
 
 include_directories(src_cpp)
 add_subdirectory(src_cpp)
-# add_subdirectory(dev) add_subdirectory(tests)
+#  add_subdirectory(tests)
 add_subdirectory(apps)
+add_subdirectory(dev)

@@ -57,7 +57,7 @@ def sigmoid_percentile(p, params):
 
 
 def prefiltering(
-    opt_param_band, imgband, normalband, sunvisband, skyvisband, xprofband, omega_sun, use_img_value=True
+    opt_param_band, imgband, normalband, sunvisband, skyvisband, skycamband, xprofband, omega_sun, use_img_value=True
 ):
     ########################
     # Filtering by Shape of Sigmoid
@@ -91,6 +91,13 @@ def prefiltering(
     skyvisband_shadow = np.take_along_axis(skyvisband[preindex, :, 0], xidshadow.reshape(-1, 1), 1)
     skyvisband_lit = np.take_along_axis(skyvisband[preindex, :, 0], xidlit.reshape(-1, 1), 1)
 
+    if skycamband is None:
+        skycamband_shadow = None
+        skycamband_lit = None
+    else:
+        skycamband_shadow = np.take_along_axis(skycamband[preindex, ...], xidshadow.reshape(-1, 1), 1)
+        skycamband_lit = np.take_along_axis(skycamband[preindex, ...], xidlit.reshape(-1, 1), 1)
+
     filter_positive_normal = np.logical_and(normalband_lit @ omega_sun > 0, normalband_shadow @ omega_sun > 0)
     # print(f'filter_positive_normal {filter_positive_normal.sum()}')
     filter_same_normal = (normalband_lit * normalband_shadow).sum(axis=2) > 0.9
@@ -119,6 +126,11 @@ def prefiltering(
     normalband_pair = normalband_lit[filter_cmb] + normalband_shadow[filter_cmb]
     normalband_pair /= np.linalg.norm(normalband_pair, 2, axis=1, keepdims=True)
     skyvisband_pair = 0.5 * (skyvisband_lit[filter_cmb] + skyvisband_shadow[filter_cmb])
+    if skycamband is None:
+        skycamband_pair = None
+    else:
+        skycamband_pair = 0.5 * (skycamband_lit[filter_cmb] + skycamband_shadow[filter_cmb])
+        
     if use_img_value:
         imgband_shadow = imgband_shadow[filter_cmb.ravel()]
         imgband_lit = imgband_lit[filter_cmb.ravel()]
@@ -134,7 +146,16 @@ def prefiltering(
     # validate
     assert (np.take_along_axis(imgband[sample_index, ...], xidlit.reshape(-1, 1, 1), axis=1) == imgband_lit).all()
 
-    return sample_index, xidlit, xidshadow, imgband_lit, imgband_shadow, normalband_pair, skyvisband_pair
+    return (
+        sample_index,
+        xidlit,
+        xidshadow,
+        imgband_lit,
+        imgband_shadow,
+        normalband_pair,
+        skyvisband_pair,
+        skycamband_pair,
+    )
 
 
 def _get_parser():
@@ -142,7 +163,7 @@ def _get_parser():
 
     parser = argparse.ArgumentParser(description="Compute Lit Shadow Ratio (Sun/Sky Ratio)")
     parser.add_argument("input_folder", type=str, help="Input folder (ContextCapture Tiled OBJ)")
-    parser.add_argument("--skymodel", type=str, choices=["Simple", "AO"], default="Simple", help="Sky Model")
+    parser.add_argument("--skymodel", type=str, choices=["Simple", "AO", "Skycam"], default="Simple", help="Sky Model")
     parser.add_argument("--logarithm_phi", action="store_true", help="Use logarithm of phi")
     return parser
 
@@ -176,6 +197,7 @@ def _main():
     frame_imgband = []
     frame_sunvisband = []
     frame_skyvisband = []
+    frame_skycamband = []
     frame_normalband = []
     frame_omega_sun = []
 
@@ -199,6 +221,9 @@ def _main():
         frame_normalband.append(lsbandsol["normal"])
         frame_sunvisband.append(lsbandsol["sunvis"])
         frame_skyvisband.append(lsbandsol["skyvis"])
+        if args.skymodel == "Skycam" and "skycam" not in lsbandsol:
+            raise ValueError("Skycam model is selected but skycam data is not found")
+        frame_skycamband.append(lsbandsol.get("skycam", None))
         frame_omega_sun.append(omega_sun)
 
     xprofband = lsbandsol["xprof"]
@@ -214,12 +239,23 @@ def _main():
         omega_sun = frame_omega_sun[fi]
         normalband = frame_normalband[fi]
         skyvisband = frame_skyvisband[fi]
-        sample_index, xidlit, xidshadow, imgband_lit, imgband_shadow, normalband_pair, skyvisband_pair = prefiltering(
+        skycamband = frame_skycamband[fi]
+        (
+            sample_index,
+            xidlit,
+            xidshadow,
+            imgband_lit,
+            imgband_shadow,
+            normalband_pair,
+            skyvisband_pair,
+            skycamband_pair,
+        ) = prefiltering(
             frame_opt_param_band[fi],
             frame_imgband[fi],
             frame_normalband[fi],
             frame_sunvisband[fi],
             frame_skyvisband[fi],
+            frame_skycamband[fi],
             xprofband=xprofband,
             omega_sun=omega_sun,
         )
@@ -227,11 +263,20 @@ def _main():
         active_skyvisband = None
         active_skyvisband_pair = None
         if OPTION_skyvis_model == "Simple":
+            # 1 channel only
             active_skyvisband = 0.5 * np.maximum(normalband[..., 2], 0) + 0.5
             active_skyvisband_pair = 0.5 * np.maximum(normalband_pair[..., 2], 0) + 0.5
-        else:
+        elif OPTION_skyvis_model == "AO":
+            # 1 channel only
             active_skyvisband = skyvisband
             active_skyvisband_pair = skyvisband_pair
+        elif OPTION_skyvis_model == "Skycam":
+            # 3 channels
+            assert (skycamband is not None) and (skycamband_pair is not None), "Skycam data is not found"
+            active_skyvisband = skycamband
+            active_skyvisband_pair = skycamband_pair
+        else:
+            raise ValueError(f"Unknown skyvis model {OPTION_skyvis_model}")
 
         ######################################
         # imglit = rho* (psi_sun * max(0, normal @ omega_sun) + psi_sky * skyvis)

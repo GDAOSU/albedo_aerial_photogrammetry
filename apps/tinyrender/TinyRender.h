@@ -17,7 +17,7 @@ struct aiScene;
 class TinyRender {
  public:
   using CameraT = PinholeRadialTangentialCamera;
-  enum SUPPORTED_BUFFERS { GEOMID, BARYCENTRIC, DEPTH, NORMAL, PRIMID, COLOR, INDIR, SUNVIS, SKYVIS, NUM_BUFFERS };
+  enum SUPPORTED_BUFFERS { GEOMID, BARYCENTRIC, DEPTH, NORMAL, PRIMID, COLOR, INDIR, SUNVIS, SKYVIS, SKYCAM, NUM_BUFFERS };
   const static std::string BUFFERS_NAME[NUM_BUFFERS];
   std::string bufferName(int bid) { return BUFFERS_NAME[bid]; }
 
@@ -28,6 +28,7 @@ class TinyRender {
 
   bool load_imagedataset(std::string inpath);
   bool load_modeldataset(std::string inpath);
+  bool load_environment(std::string inpath);
   bool prepare_data();
 
   inline const RTCBounds& scene_bounds() { return scenebounds; }
@@ -62,6 +63,7 @@ class TinyRender {
   const float EPSILON = 0.01f;
 
   std::vector<std::string> imagelist;
+  std::vector<std::string> envmaplist;
 
   nlohmann::json imagejson;
   nlohmann::json modeljson;
@@ -78,6 +80,7 @@ class TinyRender {
   std::vector<float> barycentricBuffer;
   std::vector<uint8_t> colorBuffer, indirBuffer;
   std::vector<uint8_t> sunVisBuffer, skyVisBuffer;
+  std::vector<float> skyCamBuffer;
   std::vector<uint32_t> skyHitBuffer;
 };
 

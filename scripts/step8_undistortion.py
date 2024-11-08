@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import imageio
 import argparse
 from tqdm import tqdm
@@ -5,6 +7,7 @@ import json
 import numpy as np
 import os
 import os.path as osp
+from pathlib import Path
 
 from functools import lru_cache
 from skimage import img_as_float
@@ -176,24 +179,19 @@ class RadialTangentialModel:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog=osp.basename(__file__))
-    parser.add_argument("imagedb", type=str)
-    parser.add_argument("imagefolder", type=str)
-    parser.add_argument("--extension", type=str, default=".exr")
-    parser.add_argument("--ldrextension", type=str, default=".png")
-    parser.add_argument("--gammar_correction", action="store_true", help="Apply Gamma Correction")
+    parser.add_argument("imagedb", type=str, help="Image Database (JSON File)")
+    parser.add_argument("infolder", type=str, help="Input Folder, support .exr and .png files")
+    parser.add_argument("outfolder", type=str, help="Output Folder")
 
     args = parser.parse_args()
     ###############
-    HDRIMG_EXTENSION = args.extension
-    LDRIMG_EXTENSION = args.ldrextension
-    IMAGEDB_PATH = args.imagedb
-    IMAGE_FOLDER = args.imagefolder
-    UNDISTIMAGE_FOLDER = osp.join(IMAGE_FOLDER, "undist")
-    if not osp.exists(UNDISTIMAGE_FOLDER):
-        os.makedirs(UNDISTIMAGE_FOLDER, exist_ok=True)
+    HDRIMG_EXTENSION = "exr"
+    imgdb_path = Path(args.imagedb)
+    in_dir = Path(args.infolder)
+    out_dir = Path(args.outfolder)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    with open(IMAGEDB_PATH, "r") as f:
-        imgdb = json.load(f)
+    imgdb = json.load(imgdb_path.open("r"))
 
     IMGLIST = list(imgdb["Extrinsic"].keys())
 
@@ -213,55 +211,39 @@ if __name__ == "__main__":
         )
 
     for imgname in tqdm(IMGLIST, desc="Undistorting"):
-        imgpath = osp.join(IMAGE_FOLDER, imgname + HDRIMG_EXTENSION)
-        outhdrpath = osp.join(UNDISTIMAGE_FOLDER, imgname + HDRIMG_EXTENSION)
-        outldrpath = osp.join(UNDISTIMAGE_FOLDER, imgname + LDRIMG_EXTENSION)
-        outldrcampath = outldrpath + ".cam"
+        in_path = osp.join(in_dir, f"{imgname}.{HDRIMG_EXTENSION}")
+        out_path = osp.join(out_dir, f"{imgname}.{HDRIMG_EXTENSION}")
 
         imgext = imgdb["Extrinsic"][imgname]
         camname = imgext["Camera"]
         cammodel = camdistmodels[camname]
 
-        file = imreader(imgpath)
-        imheight = file.shape[0]
-        imwidth = file.shape[1]
-        isRGB = file.shape[-1] == 3
+        img = imreader(in_path)
+        imheight = img.shape[0]
+        imwidth = img.shape[1]
 
         if imheight != cammodel.height or imwidth != cammodel.width:
             cammodel.resize(imwidth, imheight)
 
-        if not osp.exists(outhdrpath):
-            # Undistort HDR Image
-            HDRimg = file
-            undistHDRimg = cammodel.undistort_image(HDRimg).astype(HDRimg.dtype)
+        # Undistort HDR Image
+        undist_img = cammodel.undistort_image(img).astype(img.dtype)
+        # Write to file
+        imwriter(undist_img, out_path)
 
-            # Write to file
-            imwriter(undistHDRimg, outhdrpath)
-
-        # Convert to LDR
-        if isRGB and not osp.exists(outldrpath):
-            undistHDRimg = imreader(outhdrpath)
-            undistLDRimg = undistHDRimg.copy()
-            undistLDRimg /= np.nanpercentile(undistLDRimg.reshape(-1), 99, axis=0)
-            undistLDRimg = np.clip(undistLDRimg, 0, 1)
-            if args.gammar_correction:
-                undistLDRimg = undistLDRimg ** (1 / 2.2)  # Gamma correction
-            imageio.imwrite(outldrpath, (undistLDRimg * 255).astype(np.uint8))
-
-        C = np.array([imgext["X"], imgext["Y"], imgext["Z"]]).reshape(3, 1)
-        R = np.array(
-            [
-                [imgext["r11"], imgext["r12"], imgext["r13"]],
-                [imgext["r21"], imgext["r22"], imgext["r23"]],
-                [imgext["r31"], imgext["r32"], imgext["r33"]],
-            ]
-        )
-        t = -R @ C
-        # View Information
-        normalized_focal = cammodel.undistK[0, 0] / np.maximum(cammodel.width, cammodel.height)
-        normalized_cx = cammodel.undistK[0, 2] / cammodel.width
-        normalized_cy = cammodel.undistK[1, 2] / cammodel.height
-        camstr = f"{t[0,0]} {t[1,0]} {t[2,0]} {R[0,0]} {R[0,1]} {R[0,2]} {R[1,0]} {R[1,1]} {R[1,2]} {R[2,0]} {R[2,1]} {R[2,2]}\n"
-        camstr += f"{normalized_focal} 0 0 1 {normalized_cx} {normalized_cy}\n"
-        open(outldrcampath, "w").write(camstr)
+        # C = np.array([imgext["X"], imgext["Y"], imgext["Z"]]).reshape(3, 1)
+        # R = np.array(
+        #     [
+        #         [imgext["r11"], imgext["r12"], imgext["r13"]],
+        #         [imgext["r21"], imgext["r22"], imgext["r23"]],
+        #         [imgext["r31"], imgext["r32"], imgext["r33"]],
+        #     ]
+        # )
+        # t = -R @ C
+        # # View Information
+        # normalized_focal = cammodel.undistK[0, 0] / np.maximum(cammodel.width, cammodel.height)
+        # normalized_cx = cammodel.undistK[0, 2] / cammodel.width
+        # normalized_cy = cammodel.undistK[1, 2] / cammodel.height
+        # camstr = f"{t[0,0]} {t[1,0]} {t[2,0]} {R[0,0]} {R[0,1]} {R[0,2]} {R[1,0]} {R[1,1]} {R[1,2]} {R[2,0]} {R[2,1]} {R[2,2]}\n"
+        # camstr += f"{normalized_focal} 0 0 1 {normalized_cx} {normalized_cy}\n"
+        # open(outldrcampath, "w").write(camstr)
     print("Done")

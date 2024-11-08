@@ -166,7 +166,7 @@ def fit_lsband(lsband: dict) -> dict():
 
     assert len(_c) == len(valid_opt_param)
 
-    return dict(
+    out = dict(
         index=_c,
         opt_param=valid_opt_param,
         centers=sample_cent[_c],
@@ -181,6 +181,9 @@ def fit_lsband(lsband: dict) -> dict():
         edtsunvis=edtsunvisband[_c],
         dogdepth=dogdepband[_c],
     )
+    if "skycam" in lsband:
+        out["skycam"] = lsband["skycam"][_c]
+    return out
 
 
 def _get_parser():

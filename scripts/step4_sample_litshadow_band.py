@@ -108,13 +108,16 @@ def ensure_finite(img: np.ndarray) -> np.ndarray:
             img[..., c] = ensure_finite(img[..., c])
     return img
 
+
 import OpenImageIO as oiio
 from OpenImageIO import ImageInput, ImageSpec, ImageBuf, ImageBufAlgo
+
 config = ImageSpec()
 config["oiio:RawColor"] = 1
 config["raw:ColorSpace"] = "Linear"
 
 MAX_CACHE = 50
+
 
 @lru_cache(MAX_CACHE)
 def imreader(p: str) -> np.ndarray:
@@ -124,7 +127,7 @@ def imreader(p: str) -> np.ndarray:
         imghandle = ImageInput.open(p, config)
         if imghandle is None:
             raise ValueError("Failed to open image: %s" % p)
-        
+
         data = imghandle.read_image()
         imghandle.close()
         if data.ndim == 2:
@@ -311,8 +314,8 @@ def find_litboundary(sunviscrf, MIN_BOUNDARY_LENGTH=100):
         c.astype(np.float32) for c in measure.find_contours(sunviscrf, level=0.5) if len(c) > MIN_BOUNDARY_LENGTH
     ]
     simpboundary = [cv2.approxPolyDP(np.expand_dims(l, 1), 2, False)[:, 0, :] for l in contours]
-    
-    if False: # Display the detected boundary
+
+    if False:  # Display the detected boundary
         plt.matshow(sunviscrf)
         for l in contours:
             print(l)
@@ -323,7 +326,7 @@ def find_litboundary(sunviscrf, MIN_BOUNDARY_LENGTH=100):
             plt.plot(l[:, 1], l[:, 0])
             plt.scatter(l[:, 1], l[:, 0], marker="x")
         plt.show()
-        
+
     return contours
 
 
@@ -343,7 +346,7 @@ def sample_contours(contours, interval=1):
 
 
 def process_sample_litshadow_band(data: dict, radius: int) -> dict:
-    litboundary = find_litboundary(data["sunviscrf"][...,0])
+    litboundary = find_litboundary(data["sunviscrf"][..., 0])
 
     sample_center = [l for l in litboundary if len(l) > MIN_BOUNDARY_LENGTH]
     if len(sample_center) == 0:
@@ -363,7 +366,7 @@ def process_sample_litshadow_band(data: dict, radius: int) -> dict:
 
     sampler = ProfileSampler((height, width), sample_center, sample_grad, radius)
 
-    if False: # Display footprint of bands
+    if False:  # Display footprint of bands
         fig, ax = plt.subplots()
         ax.matshow(data["img"])
         linepts = np.stack(
@@ -378,37 +381,31 @@ def process_sample_litshadow_band(data: dict, radius: int) -> dict:
         ax.add_collection(lines)
         plt.show()
 
-    profiles = {
-        k: sampler.exec_mp(data[k])
-        for k in (
-            "img",
-            "depth",
-            "normal",
-            "sunviscrf",
-            "skyvisratio",
-            # , 'geomid', 'barycentric'
-        )
-    }
+    keys_to_sample = ["img", "depth", "normal", "sunviscrf", "skyvisratio"]
+    if "skycam" in data:
+        keys_to_sample.append("skycam")
+    
+    profiles = {k: sampler.exec_mp(data[k]) for k in keys_to_sample}
 
     profiles["edt_sunvis"] = sampler.exec_mp(edt_sunvis)
     profiles["dog_depth"] = sampler.exec_mp(dog_depth)
 
-    if False: # display sampled bands
+    if False:  # display sampled bands
         fig, ax = plt.subplots()
-        ax.matshow(data['img'])
+        ax.matshow(data["img"])
         # draw
         _L = len(sampler.sample_center)
-        _start = int(_L*0.3) # percentile
-        sel = np.s_[_start: _start + 100]
+        _start = int(_L * 0.3)  # percentile
+        sel = np.s_[_start : _start + 100]
         sampled_centers = sampler.sample_center[sel]
         print("sampled centers", sampled_centers.shape)
         ax.scatter(sampled_centers[:, 1], sampled_centers[:, 0], marker="x", color="red")
-        
-        for k in ['img','depth','sunviscrf','normal', 'skyvisratio', 'edt_sunvis', 'dog_depth']:
+
+        for k in ["img", "depth", "sunviscrf", "normal", "skyvisratio", "edt_sunvis", "dog_depth"]:
             plt.matshow(profiles[k][sel])
             plt.title(k)
         plt.show()
-        
+
     profiles["sampler"] = dict(
         width=sampler.width,
         height=sampler.height,
@@ -428,7 +425,8 @@ def _get_parser():
 
     parser = argparse.ArgumentParser(description="Sample Lit Shadow Band")
     parser.add_argument("input_folder", type=str, help="Input folder (ContextCapture Tiled OBJ)")
-
+    parser.add_argument("--skycam", action="store_true", help="Use sky camera image")
+    parser.add_argument("--force", action="store_true", help="Force overwrite")
     parser.add_argument("--radius", type=int, help="Radius of sampling", default=5)
 
     return parser
@@ -470,10 +468,12 @@ def _main():
             logger.info(f"Processing {imgname}")
         imgmeta = imgdb["ImageMeta"][imgname]
         lsbandpkl = litshadow_band_dir / f"{imgname}.pkl"
-        if osp.exists(lsbandpkl):
+        
+        if osp.exists(lsbandpkl) and not args.force:
             if verbose:
                 logger.info("File already exists")
             continue
+
         paths = dict(
             img=work_dir / "image" / (imgname + ".exr"),
             thumbnail=work_dir / "thumbnail" / (imgname + ".png"),
@@ -484,25 +484,27 @@ def _main():
             # geomid=osp.join(WORKDIR, 'geomid', imgname+'.exr'),
             # barycentric=osp.join(WORKDIR, 'barycentric', imgname+'.exr')
         )
+        if args.skycam:
+            print("Require `skycam` folder")
+            paths["skycam"] = work_dir / "skycam" / (imgname + ".exr")
 
         sunpos = np.array([imgmeta[k] for k in ("Sun:LocalPos_x", "Sun:LocalPos_y", "Sun:LocalPos_z")])
 
         if not check_files(paths):
-
-            print("File not sufficient")
+            logger.info("File not sufficient")
             continue
 
         if verbose:
             logger.info("Reading ...")
         _st = time.time()
         data = {k: imreader(v) for k, v in paths.items()}
-        
-        if False: # display raw bands
+
+        if False:  # display raw bands
             for k, v in data.items():
                 plt.matshow(v)
                 plt.title(k)
             plt.show()
-        
+
         if verbose:
             logger.info(f"{time.time()-_st:.3f}s")
 
@@ -511,6 +513,8 @@ def _main():
         _st = time.time()
         data["depth"] = ensure_finite(data["depth"])
         data["normal"] = ensure_finite(data["normal"])
+        if args.skycam:
+            data["skycam"] = ensure_finite(data["skycam"])
         data["sunpos"] = sunpos
         # data['geomid'] = data['geomid'].astype(np.uint32)
         if verbose:

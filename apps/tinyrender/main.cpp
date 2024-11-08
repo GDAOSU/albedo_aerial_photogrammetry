@@ -37,6 +37,7 @@ cxxopts::Options getOptions(std::string exepath) {
   options.add_options()
     ("imagedataset", "image dataset json including intrinsic, extrinsic and metadata.", cxxopts::value<std::string>())
     ("modeldataset", "model dataset json. Normal and Color are required.", cxxopts::value<std::string>())
+    ("environment", "environment light", cxxopts::value<std::string>())
     ("output", "Output dir.", cxxopts::value<std::string>())
     ("znear", "Clip to znear", cxxopts::value<float>()->default_value("-1."))
     ("zfar", "Clip to zfar", cxxopts::value<float>()->default_value("-1."))
@@ -58,6 +59,7 @@ cxxopts::Options getOptions(std::string exepath) {
     ("indir", "Write color buffer", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
     ("sunvis", "Write sunvis buffer", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
     ("skyvis", "Write skyvis buffer", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+    ("skycam", "Write skycam buffer", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
     ("all", "Write all available buffers.", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
     // ("indirsamples", "Number of samples for Indirect light.", cxxopts::value<size_t>()->default_value("32"))
     // ("skysamples", "Number of samples for sky visibility.", cxxopts::value<size_t>()->default_value("32"));
@@ -81,6 +83,7 @@ int main(int argc, char** argv) {
   // Setting parameters
   std::string imagejson_path = args["imagedataset"].as<std::string>();
   std::string modeljson_path = args["modeldataset"].as<std::string>();
+  std::string environment_path = args["environment"].as<std::string>();
   std::string output_path = args["output"].as<std::string>();
 
   if (!fs::exists(imagejson_path)) {
@@ -118,6 +121,7 @@ int main(int argc, char** argv) {
   render.set_cull(cull);
   if (!render.load_imagedataset(imagejson_path)) exit(2);
   if (!render.load_modeldataset(modeljson_path)) exit(2);
+  if (!render.load_environment(environment_path)) exit(2);
 
   size_t num_images = render.num_images();
   startID = min(startID, int(num_images - 1));
@@ -132,6 +136,7 @@ int main(int argc, char** argv) {
   spdlog::info("**** Tiny Render ****");
   spdlog::info("Load ImageDataset: {}", imagejson_path);
   spdlog::info("Load ModelDataset: {}", modeljson_path);
+  spdlog::info("Environment: {}", environment_path);
   spdlog::info("Downsample Rate: {}", nDownsample);
   spdlog::info("Render Range [{}-{}) [{}/{}]", startID, endID, endID - startID, num_images);
   spdlog::info("Output Dir: {}", output_path);

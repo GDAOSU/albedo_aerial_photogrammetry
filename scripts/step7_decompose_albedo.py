@@ -18,6 +18,20 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from skimage.morphology import erosion, dilation, disk
+
+
+def maskout_penumbra(binary_sunvis: np.ndarray, erode_radius=10):
+    H, W = binary_sunvis.shape[:2]
+    lit_mask = binary_sunvis > 0.5
+    shadow_mask = binary_sunvis <= 0.5
+
+    # Erode masks
+    lit_mask = erosion(lit_mask[..., 0].astype(np.uint8), disk(erode_radius))[..., None] > 0
+    shadow_mask = erosion(shadow_mask[..., 0].astype(np.uint8), disk(erode_radius))[..., None] > 0
+
+    return np.logical_or(lit_mask, shadow_mask)
+
 
 def get_illumination(normal, psi_sun, omega_sun, phi_skysun, skyvis, skyvis_model):
     if skyvis_model == "Simple":
@@ -100,6 +114,7 @@ def _get_parser():
     parser.add_argument("--median_phi", action="store_true", help="Use median phi")
     parser.add_argument("--average_phi", action="store_true", help="Use average phi")
     parser.add_argument("--refine_sunvis", action="store_true", help="Refine sunvis")
+    
     return parser
 
 
@@ -127,20 +142,32 @@ def _main() -> int:
     frame_omega_sun = dict(zip(phipack["frame_name"], np.array(phipack["frame_omega_sun"])))
     psi_sun = np.array(phipack["psi_sun"])
 
-    out_albedo_dir = work_dir / output_folder_name
-    out_albedo_dir.mkdir(exist_ok=True)
+    output_dir = work_dir / output_folder_name
+
+    out_albedo_dir = output_dir / "albedo"
+    out_mask_dir = output_dir / "mask"
+    out_sunvis_dir = output_dir / "sunvis"
+    out_sunshading_dir = output_dir / "sun_shading"
+    out_skyshading_dir = output_dir / "sky_shading"
+
+    out_albedo_dir.mkdir(parents=True, exist_ok=True)
+    out_mask_dir.mkdir(parents=True, exist_ok=True)
+    out_sunvis_dir.mkdir(parents=True, exist_ok=True)
+    out_sunshading_dir.mkdir(parents=True, exist_ok=True)
+    out_skyshading_dir.mkdir(parents=True, exist_ok=True)
 
     # Load Images
     imgdb = json.load(imagejson_path.open())
 
     IMGLIST = list(imgdb["Extrinsic"].keys())
     verbose = True
-    for imgname in tqdm(IMGLIST):
-        output_albedo_hdr_path = out_albedo_dir / (f"{imgname}.exr")
-        output_refinealpha_path = out_albedo_dir / (f"sunvis_{imgname}.exr")
-        output_albedo_ldr_path = out_albedo_dir / (f"{imgname}_ldr.png")
-        if output_albedo_hdr_path.exists() and output_albedo_ldr_path.exists():
-            continue
+    for imgname in tqdm(IMGLIST, desc="Decomposing Albedo"):
+
+        out_albedo_path = out_albedo_dir / (f"{imgname}.exr")
+        out_mask_path = out_mask_dir / (f"{imgname}.exr")
+        out_sunvis_path = out_sunvis_dir / (f"{imgname}.exr")
+        out_sunshading_path = out_sunshading_dir / (f"{imgname}.exr")
+        out_skyshading_path = out_skyshading_dir / (f"{imgname}.exr")
 
         if verbose:
             logger.info(f"Processing {imgname}")
@@ -171,6 +198,8 @@ def _main() -> int:
             normal=imreader(paths["normal"]),
             lsband=pickle.load(open(paths["lsbandpkl"], "rb")),
         )
+        data["geometry_mask"] = np.isfinite(data["depth"])
+        assert data["geometry_mask"].ndim == 3, f"Invalid geometry mask shape {data['geometry_mask'].shape}"
 
         height, width = data["img"].shape[:2]
 
@@ -212,24 +241,21 @@ def _main() -> int:
             )
         else:
             refined_alpha = data["sunviscrf"]
-            
+
+        # Generate mask from geometry and sunvis(to exclude penumbra)
+        albedo_mask = np.logical_and(maskout_penumbra(data["sunviscrf"]), data["geometry_mask"])
+
         illumination = sun_illum * refined_alpha + sky_illum
         reflectance = data["img"] / (illumination + 1e-7)
         reflectance = np.clip(reflectance, 0, max_reflectance)
 
-        reflectance_ldr = reflectance.copy()
-        reflectance_ldr /= np.percentile(reflectance_ldr.reshape(-1, 3), 99, axis=0)
-        reflectance_ldr = reflectance_ldr ** (1 / 2.2)
-        reflectance_ldr = np.clip(reflectance_ldr, 0, 1)
         #######
+        imageio.imwrite(str(out_albedo_path), reflectance.astype(np.float32))
+        imageio.imwrite(str(out_mask_path), albedo_mask.astype(np.float32))
+        imageio.imwrite(str(out_sunvis_path), refined_alpha.astype(np.float32))
+        imageio.imwrite(str(out_sunshading_path), sun_illum.astype(np.float32))
+        imageio.imwrite(str(out_skyshading_path), sky_illum.astype(np.float32))
 
-        # pyexr.write(str(output_albedo_hdr_path), reflectance)
-        # print(reflectance.shape)
-        # plt.matshow(reflectance)
-        # plt.show()
-        imageio.imwrite(str(output_albedo_hdr_path), reflectance.astype(np.float32))
-        imageio.imwrite(str(output_refinealpha_path), refined_alpha.astype(np.float32))
-        imageio.imwrite(str(output_albedo_ldr_path), (reflectance_ldr * 255).astype(np.uint8))
         if verbose:
             logger.info(f"{time.time()-_st:.3f}s")
 
