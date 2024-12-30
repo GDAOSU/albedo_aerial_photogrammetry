@@ -5,7 +5,11 @@
 #if defined(USE_CERES_SOLVER)
 #include <ceres/autodiff_cost_function.h>
 #include <ceres/ceres.h>
+#if (CERES_VERSION_MAJOR >= 2 && CERES_VERSION_MINOR >= 1)
+#else
 #include <ceres/local_parameterization.h>
+#endif
+//
 #include <ceres/problem.h>
 #include <ceres/solver.h>
 

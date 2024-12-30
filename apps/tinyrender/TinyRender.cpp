@@ -425,21 +425,35 @@ bool TinyRender::render_frame(size_t id) {
 
   // Output Section
   sw.reset();
-  if (requireBuffers[GEOMID])
-    SaveUIntNEXR(geomidBuffer, camera.w, camera.h, 5, outputDirs[GEOMID] / (imgname + ".exr"));
-  if (requireBuffers[BARYCENTRIC])
-    SaveHalfNEXR(barycentricBuffer, camera.w, camera.h, 2, outputDirs[BARYCENTRIC] / (imgname + ".exr"));
-  if (requireBuffers[DEPTH]) SaveHalf1EXR(depthBuffer, camera.w, camera.h, outputDirs[DEPTH] / (imgname + ".exr"));
-  if (requireBuffers[NORMAL]) SaveHalf3EXR(normalBuffer, camera.w, camera.h, outputDirs[NORMAL] / (imgname + ".exr"));
+  if (requireBuffers[GEOMID]) {
+    std::filesystem::path pth = outputDirs[GEOMID] / (imgname + ".exr");
+    SaveUIntNEXR(geomidBuffer, camera.w, camera.h, 5, pth.string());
+  }
+
+  if (requireBuffers[BARYCENTRIC]) {
+    std::filesystem::path pth = outputDirs[BARYCENTRIC] / (imgname + ".exr");
+    SaveHalfNEXR(barycentricBuffer, camera.w, camera.h, 2, pth.string());
+  }
+
+  if (requireBuffers[DEPTH]) {
+    std::filesystem::path pth = outputDirs[DEPTH] / (imgname + ".exr");
+    SaveHalf1EXR(depthBuffer, camera.w, camera.h, pth.string());
+  }
+  if (requireBuffers[NORMAL]) {
+    std::filesystem::path pth = outputDirs[NORMAL] / (imgname + ".exr");
+    SaveHalf3EXR(normalBuffer, camera.w, camera.h, pth.string());
+  }
   // if (requireBuffers[COLOR]) stbi_write_png((outputDirs[COLOR] / (imgname + ".png")).c_str(),camera.w, camera.h,
   // 3, colorBuffer.data(), camera.w * 3); if (requireBuffers[INDIR]) stbi_write_png((outputDirs[INDIR] / (imgname +
   // ".png")).c_str(), camera.w, camera.h, 3, indirBuffer.data(), camera.w * 3);
-  if (requireBuffers[SUNVIS])
-    stbi_write_png((outputDirs[SUNVIS] / (imgname + ".png")).c_str(), camera.w, camera.h, 1, sunVisBuffer.data(),
-                   camera.w);
+  if (requireBuffers[SUNVIS]) {
+    std::filesystem::path pth = outputDirs[SUNVIS] / (imgname + ".png");
+    stbi_write_png(pth.string().c_str(), camera.w, camera.h, 1, sunVisBuffer.data(), camera.w);
+  }
+
   if (requireBuffers[SKYVIS]) {
-    stbi_write_png((outputDirs[SKYVIS] / (imgname + ".png")).c_str(), camera.w, camera.h, 1, skyVisBuffer.data(),
-                   camera.w);
+    std::filesystem::path pth = outputDirs[SKYVIS] / (imgname + ".png");
+    stbi_write_png(pth.string().c_str(), camera.w, camera.h, 1, skyVisBuffer.data(), camera.w);
   }
   spdlog::info("Write Buffers: {:.3}s", sw);
 

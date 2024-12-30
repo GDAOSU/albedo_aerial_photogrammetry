@@ -1,0 +1,3 @@
+#### VS2022
+
+cmake -DCMAKE_CXX_FLAGS="/arch:AVX2 /D_USE_MATH_DEFINES" .. 

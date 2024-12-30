@@ -32,9 +32,9 @@ class TinyRender {
 
   inline const RTCBounds& scene_bounds() { return scenebounds; }
   inline void set_downsampler(int v) { downsampler = v; }
-  inline void set_clipping(float near, float far) {
-    znear = near;
-    zfar = far;
+  inline void set_clipping(float near_, float far_) {
+    znear = near_;
+    zfar = far_;
   }
   inline void set_cull(bool cull) { this->cull = cull; }
   bool set_scene(const aiScene* aiscene);
