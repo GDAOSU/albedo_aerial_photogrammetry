@@ -214,6 +214,8 @@ if __name__ == "__main__":
 
     for imgname in tqdm(IMGLIST, desc="Undistorting"):
         imgpath = osp.join(IMAGE_FOLDER, imgname + HDRIMG_EXTENSION)
+        if not os.path.exists(imgpath):
+            continue
         outhdrpath = osp.join(UNDISTIMAGE_FOLDER, imgname + HDRIMG_EXTENSION)
         outldrpath = osp.join(UNDISTIMAGE_FOLDER, imgname + LDRIMG_EXTENSION)
         outldrcampath = outldrpath + ".cam"

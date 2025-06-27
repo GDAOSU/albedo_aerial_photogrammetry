@@ -209,6 +209,9 @@ def _main():
     print(f"Found {num_frames} frames, constraints: {frame_numsamples}")
 
     frame_phi_skysun = []
+    new_frame_imgname = []
+    new_frame_timestamp = []
+    new_frame_omega_sun = []
     for fi in tqdm(range(num_frames)):
         print(f"Processing {frame_imgname[fi]}...")
         omega_sun = frame_omega_sun[fi]
@@ -277,7 +280,9 @@ def _main():
 
         psi_sky = ratio_sky_sun * CONST_PSI_SUN
         frame_phi_skysun.append(ratio_sky_sun)
-
+        new_frame_imgname.append(frame_imgname[fi])
+        new_frame_timestamp.append(frame_timestamp[fi])
+        new_frame_omega_sun.append(frame_omega_sun[fi])
         # Illumination = psi_sun * np.expand_dims(frame_sunvisband[fi] * np.maximum(
         #     normalband[fi]@omega_sun, 0), 2) + psi_sky*np.expand_dims(active_skyvisband, 2)
 
@@ -296,9 +301,9 @@ def _main():
             o3d.visualization.draw_geometries([cloud, axes])
 
     result = dict(
-        frame_name=frame_imgname,
-        frame_timestamp=frame_timestamp,
-        frame_omega_sun=frame_omega_sun,
+        frame_name=new_frame_imgname,
+        frame_timestamp=new_frame_timestamp,
+        frame_omega_sun=new_frame_omega_sun,
         frame_phi=frame_phi_skysun,
         psi_sun=CONST_PSI_SUN,
         skyvis_model=OPTION_skyvis_model,

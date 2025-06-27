@@ -178,7 +178,9 @@ def _main() -> int:
         data["sunpos"] = omega_sun
 
         _st = time.time()
-
+	
+        if imgname not in frame_phi:
+            continue
         current_phi = frame_phi[imgname]
         if args.median_phi:
             current_phi = median_phi
